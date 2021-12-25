@@ -17,6 +17,7 @@
 #define _TFT_eSPIH_
 
 #define TFT_ESPI_VERSION "2.4.11"
+#define DEG2RAD 0.0174532925
 
 // Bit level feature flags
 // Bit 0 set: viewport capability
@@ -471,6 +472,8 @@ class TFT_eSPI : public Print { friend class TFT_eSprite; // Sprite class has ac
            drawTriangle(int32_t x1,int32_t y1, int32_t x2,int32_t y2, int32_t x3,int32_t y3, uint32_t color),
            fillTriangle(int32_t x1,int32_t y1, int32_t x2,int32_t y2, int32_t x3,int32_t y3, uint32_t color);
 
+  void     fillArc(int x, int y, int start_angle, int seg_count, int rx, int ry, int w, unsigned int colour);
+  
   // Image rendering
            // Swap the byte order for pushImage() and pushPixels() - corrects endianness
   void     setSwapBytes(bool swap);
