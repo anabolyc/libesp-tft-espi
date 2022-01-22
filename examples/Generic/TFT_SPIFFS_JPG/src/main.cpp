@@ -20,7 +20,7 @@
 #include <FS.h>
 
 #ifdef ESP32
-  #include "SPIFFS.h"  // For ESP32 only
+#include "SPIFFS.h" // For ESP32 only
 #endif
 
 // Call up the TFT library
@@ -34,18 +34,20 @@ TFT_eSPI tft = TFT_eSPI();
 //====================================================================================
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
-  if (!SPIFFS.begin()) {
+  if (!SPIFFS.begin())
+  {
     Serial.println("SPIFFS initialisation failed!");
-    while (1) yield(); // Stay here twiddling thumbs waiting
+    while (1)
+      yield(); // Stay here twiddling thumbs waiting
   }
   Serial.println("\r\nSPIFFS initialised.");
 
   // Now initialise the TFT
   tft.begin();
-  tft.setRotation(0);  // 0 & 2 Portrait. 1 & 3 landscape
-  tft.fillScreen(TFT_BLACK);
+  tft.setRotation(TFT_ROTATION); // 0 & 2 Portrait. 1 & 3 landscape
+  tft.fillScreen(TFT_WHITE);
 }
 
 //====================================================================================
@@ -53,12 +55,14 @@ void setup()
 //====================================================================================
 void loop()
 {
-  int x = random(tft.width()  - 128);
+  int x = random(tft.width() - 128);
   int y = random(tft.height() - 160);
 
-  drawBmp("/parrot.bmp", x, y);
+  jpeg_err_t res = tft.drawJpgFile(SPIFFS, "/parrot.jpg", x, y);
+  if (res != JPEG_OK) {
+    Serial.print("JPEG failed: ");
+    Serial.println(res);
+  }
 
   delay(1000);
 }
-//====================================================================================
-

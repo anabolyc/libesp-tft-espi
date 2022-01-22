@@ -31,6 +31,7 @@
 #include <Arduino.h>
 #include <Print.h>
 #include <SPI.h>
+#include <FS.h>
 
 /***************************************************************************************
 **                         Section 2: Load library and processor specific header files
@@ -278,6 +279,11 @@ const PROGMEM fontinfo fontdata [] = {
 #define TFT_SKYBLUE     0x867D      /* 135, 206, 235 */
 #define TFT_VIOLET      0x915C      /* 180,  46, 226 */
 
+#define jpgColor(c)                                                            \
+  (((uint16_t)(((uint8_t *)(c))[0] & 0xF8) << 8) |                             \
+   ((uint16_t)(((uint8_t *)(c))[1] & 0xFC) << 3) |                             \
+   ((((uint8_t *)(c))[2] & 0xF8) >> 3))
+   
 // Next is a special 16 bit colour value that encodes to 8 bits
 // and will then decode back to the same 16 bit value.
 // Convenient for 8 bit and 16 bit transparent sprites.
@@ -372,6 +378,29 @@ int16_t tft_spi_freq;// TFT write SPI frequency
 int16_t tft_rd_freq; // TFT read  SPI frequency
 int16_t tch_spi_freq;// Touch controller read/write SPI frequency
 } setup_t;
+
+typedef enum {
+  JPEG_DIV_NONE,
+  JPEG_DIV_2,
+  JPEG_DIV_4,
+  JPEG_DIV_8,
+  JPEG_DIV_MAX
+} jpeg_div_t;
+
+typedef enum {
+  JPEG_OK,
+  JPEG_BAD_DIMENSIONS,
+  JPEG_JD_PREP_FAILED,
+  JPEG_JD_COMP_FAILED,
+  JPEG_OFFSET_OUTSIDE_SIZE,
+  JPEG_FILE_READ_ERROR
+} jpeg_err_t;
+
+typedef enum {
+  PNG_OK,
+  PNG_HTTP_ERROR,
+  PNG_FILE_READ_ERROR
+} png_err_t;
 
 /***************************************************************************************
 **                         Section 8: Class member and support functions
@@ -486,6 +515,48 @@ class TFT_eSPI : public Print { friend class TFT_eSprite; // Sprite class has ac
            drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t fgcolor, uint16_t bgcolor),
            setBitmapColor(uint16_t fgcolor, uint16_t bgcolor); // Define the 2 colours for 1bpp sprites
 
+  void     drawBmpFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y);
+  
+  inline void writePixels(uint16_t * colors, uint32_t len){
+    SPI.writePixels((uint8_t*)colors , len * 2);
+  }
+
+  int16_t jpeg_x = 0;
+  int16_t jpeg_y = 0;
+
+  jpeg_err_t     drawJpg(const uint8_t *jpg_data, size_t jpg_len, uint16_t x = 0,
+                  uint16_t y = 0, uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+                  uint16_t offX = 0, uint16_t offY = 0,
+                  jpeg_div_t scale = JPEG_DIV_NONE);
+
+  jpeg_err_t     drawJpg(fs::FS &fs, const char *path, uint16_t x = 0, uint16_t y = 0,
+                    uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+                    uint16_t offX = 0, uint16_t offY = 0,
+                    jpeg_div_t scale = JPEG_DIV_NONE);
+
+  jpeg_err_t     drawJpgFile(fs::FS &fs, const char *path, uint16_t x = 0, uint16_t y = 0,
+                    uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+                    uint16_t offX = 0, uint16_t offY = 0,
+                    jpeg_div_t scale = JPEG_DIV_NONE);
+  
+  // #if defined(ESP8266) || defined(ESP32)
+  // void     drawJpgUrl(const char *url, uint16_t x = 0, uint16_t y = 0,
+  //                   uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+  //                   uint16_t offX = 0, uint16_t offY = 0,
+  //                   jpeg_div_t scale = JPEG_DIV_NONE);
+  // #endif
+
+  png_err_t     drawPngFile(fs::FS &fs, const char *path, uint16_t x = 0, uint16_t y = 0,
+                    uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+                    uint16_t offX = 0, uint16_t offY = 0,
+                    double scale = 1.0, uint8_t alphaThreshold = 127);
+
+  #if defined(ESP8266) || defined(ESP32)
+  png_err_t     drawPngUrl(const char *url, uint16_t x = 0, uint16_t y = 0,
+                    uint16_t maxWidth = 0, uint16_t maxHeight = 0,
+                    uint16_t offX = 0, uint16_t offY = 0,
+                    double scale = 1.0, uint8_t alphaThreshold = 127);
+  #endif
            // Set TFT pivot point (use when rendering rotated sprites)
   void     setPivot(int16_t x, int16_t y);
   int16_t  getPivotX(void), // Get pivot x

@@ -28,6 +28,17 @@
   #include "Processors/TFT_eSPI_Generic.c"
 #endif
 
+#if defined(ESP8266) || defined(ESP32)
+#ifdef ESP32
+#include <HTTPClient.h>
+#endif
+#ifdef ESP8266
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecureBearSSL.h>
+#endif
+#endif
+
 #ifndef SPI_BUSY_CHECK
   #define SPI_BUSY_CHECK
 #endif
@@ -2587,6 +2598,455 @@ void TFT_eSPI::drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t 
   end_tft_write();              // Does nothing if Sprite class uses this function
 }
 
+// These read 16- and 32-bit types from the SD card file.
+// BMP data is stored little-endian, Arduino is little-endian too.
+// May need to reverse subscript order if porting elsewhere.
+
+uint16_t read16(fs::File &f) {
+  uint16_t result;
+  ((uint8_t *)&result)[0] = f.read(); // LSB
+  ((uint8_t *)&result)[1] = f.read(); // MSB
+  return result;
+}
+
+uint32_t read32(fs::File &f) {
+  uint32_t result;
+  ((uint8_t *)&result)[0] = f.read(); // LSB
+  ((uint8_t *)&result)[1] = f.read();
+  ((uint8_t *)&result)[2] = f.read();
+  ((uint8_t *)&result)[3] = f.read(); // MSB
+  return result;
+}
+
+// Bodmers BMP image rendering function
+void TFT_eSPI::drawBmpFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y) {
+  if ((x >= width()) || (y >= height())) return;
+
+  // Open requested file on SD card
+  File bmpFS = fs.open(path, "r");
+
+  if (!bmpFS) {
+    Serial.print("File not found");
+    return;
+  }
+
+  uint32_t seekOffset;
+  uint16_t w, h, row, col;
+  uint8_t  r, g, b;
+
+  uint32_t startTime = millis();
+
+  if (read16(bmpFS) == 0x4D42) {
+    read32(bmpFS);
+    read32(bmpFS);
+    seekOffset = read32(bmpFS);
+    read32(bmpFS);
+    w = read32(bmpFS);
+    h = read32(bmpFS);
+
+    if ((read16(bmpFS) == 1) && (read16(bmpFS) == 24) && (read32(bmpFS) == 0)) {
+      y += h - 1;
+
+      setSwapBytes(true);
+      bmpFS.seek(seekOffset);
+
+      uint16_t padding = (4 - ((w * 3) & 3)) & 3;
+      uint8_t lineBuffer[w * 3 + padding];
+
+      for (row = 0; row < h; row++) {
+        bmpFS.read(lineBuffer, sizeof(lineBuffer));
+        uint8_t*  bptr = lineBuffer;
+        uint16_t* tptr = (uint16_t*)lineBuffer;
+        // Convert 24 to 16 bit colours
+        for (col = 0; col < w; col++) {
+          b = *bptr++;
+          g = *bptr++;
+          r = *bptr++;
+          *tptr++ = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+        }
+
+        // Push the pixel row to screen, pushImage will crop the line if needed
+        // y is decremented as the BMP image is drawn bottom up
+        pushImage(x, y--, w, 1, (uint16_t*)lineBuffer);
+      }
+      Serial.print("Loaded in "); Serial.print(millis() - startTime);
+      Serial.println(" ms");
+    }
+    else Serial.println("BMP format not recognized.");
+  }
+  bmpFS.close();
+}
+
+/*
+ * JPEG
+ */
+
+#include "utility/tjpgd.h"
+
+#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_ERROR
+const char *jd_errors[] = {"Succeeded",
+                           "Interrupted by output function",
+                           "Device error or wrong termination of input stream",
+                           "Insufficient memory pool for the image",
+                           "Insufficient stream input buffer",
+                           "Parameter error",
+                           "Data format error",
+                           "Right format but not supported",
+                           "Not supported JPEG standard"};
+#endif
+
+typedef struct {
+  uint16_t x;
+  uint16_t y;
+  uint16_t maxWidth;
+  uint16_t maxHeight;
+  uint16_t offX;
+  uint16_t offY;
+  jpeg_div_t scale;
+  const void *src;
+  size_t len;
+  size_t index;
+  TFT_eSPI *tft;
+  uint16_t outWidth;
+  uint16_t outHeight;
+} jpg_file_decoder_t;
+
+static uint32_t jpgReadFile(JDEC *decoder, uint8_t *buf, uint32_t len) {
+  jpg_file_decoder_t *jpeg = (jpg_file_decoder_t *)(decoder->device);
+  File *file = (File *)(jpeg->src);
+  
+  //Serial.printf("File: %s, len = %d\n", file->name(), len);
+  if (buf) {
+    return file->read(buf, len);
+  } else {
+    file->seek(len, SeekCur);
+  }
+  return len;
+}
+
+static uint32_t jpgRead(JDEC *decoder, uint8_t *buf, uint32_t len) {
+  jpg_file_decoder_t *jpeg = (jpg_file_decoder_t *)decoder->device;
+  if (buf) {
+    memcpy(buf, (const uint8_t *)jpeg->src + jpeg->index, len);
+  }
+  jpeg->index += len;
+  return len;
+}
+
+static uint32_t jpgWrite(JDEC *decoder, void *bitmap, JRECT *jrect) {
+  jpg_file_decoder_t *jpeg = (jpg_file_decoder_t *)decoder->device;
+
+  int16_t  x = jrect->left + jpeg->tft->jpeg_x;
+  int16_t  y = jrect->top  + jpeg->tft->jpeg_y;
+  uint16_t w = jrect->right  + 1 - jrect->left;
+  uint16_t h = jrect->bottom + 1 - jrect->top;
+  if ( y >= jpeg->tft->height() ) 
+    return 0;
+  jpeg->tft->pushImage(x, y, w, h, (uint16_t*)bitmap);
+  return 1;
+}
+
+static jpeg_err_t jpgDecode(jpg_file_decoder_t *jpeg,
+                      uint32_t (*reader)(JDEC *, uint8_t *, uint32_t)) {
+  static uint8_t work[3100];
+  JDEC decoder;
+
+  JRESULT jres = jd_prepare(&decoder, reader, work, 3100, jpeg);
+  if (jres != JDR_OK) {
+    //Serial.printf("jd_prepare failed! %s", jd_errors[jres]);
+    return JPEG_JD_PREP_FAILED;
+  }
+
+  uint16_t jpgWidth = decoder.width / (1 << (uint8_t)(jpeg->scale));
+  uint16_t jpgHeight = decoder.height / (1 << (uint8_t)(jpeg->scale));
+
+  if (jpeg->offX >= jpgWidth || jpeg->offY >= jpgHeight) {
+    //log_e("Offset Outside of JPEG size");
+    return JPEG_OFFSET_OUTSIDE_SIZE;
+  }
+
+  size_t jpgMaxWidth = jpgWidth - jpeg->offX;
+  size_t jpgMaxHeight = jpgHeight - jpeg->offY;
+
+  jpeg->outWidth =
+      (jpgMaxWidth > jpeg->maxWidth) ? jpeg->maxWidth : jpgMaxWidth;
+  jpeg->outHeight =
+      (jpgMaxHeight > jpeg->maxHeight) ? jpeg->maxHeight : jpgMaxHeight;
+
+  jres = jd_decomp(&decoder, jpgWrite, (uint8_t)jpeg->scale);
+  if (jres != JDR_OK) {
+    //log_e("jd_decomp failed! %s", jd_errors[jres]);
+    return JPEG_JD_COMP_FAILED;
+  }
+
+  return JPEG_OK;
+}
+
+jpeg_err_t TFT_eSPI::drawJpg(const uint8_t *jpg_data, size_t jpg_len, uint16_t x,
+                        uint16_t y, uint16_t maxWidth, uint16_t maxHeight,
+                        uint16_t offX, uint16_t offY, jpeg_div_t scale) {
+  if ((x + maxWidth) > width() || (y + maxHeight) > height()) {
+    //log_e("Bad dimensions given");
+    return JPEG_BAD_DIMENSIONS;
+  }
+
+  jpg_file_decoder_t jpeg;
+
+  if (!maxWidth) {
+    maxWidth = width() - x;
+  }
+  if (!maxHeight) {
+    maxHeight = height() - y;
+  }
+
+  jpeg_x = x;
+  jpeg_y = y;
+
+  jpeg.src = jpg_data;
+  jpeg.len = jpg_len;
+  jpeg.index = 0;
+  jpeg.x = x;
+  jpeg.y = y;
+  jpeg.maxWidth = maxWidth;
+  jpeg.maxHeight = maxHeight;
+  jpeg.offX = offX;
+  jpeg.offY = offY;
+  jpeg.scale = scale;
+  jpeg.tft = this;
+
+  return jpgDecode(&jpeg, jpgRead);
+}
+
+jpeg_err_t TFT_eSPI::drawJpgFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y,
+                            uint16_t maxWidth, uint16_t maxHeight, uint16_t offX,
+                            uint16_t offY, jpeg_div_t scale) {
+  if ((x + maxWidth) > width() || (y + maxHeight) > height()) {
+    //log_e("Bad dimensions given");
+    return JPEG_BAD_DIMENSIONS;
+  }
+
+  File file = fs.open(path, "r");
+  if (!file) {
+    //log_e("Failed to open file for reading");
+    return JPEG_FILE_READ_ERROR;
+  }
+
+  jpg_file_decoder_t jpeg;
+
+  if (!maxWidth) {
+    maxWidth = width() - x;
+  }
+  if (!maxHeight) {
+    maxHeight = height() - y;
+  }
+
+  jpeg_x = x;
+  jpeg_y = y;
+
+  jpeg.src = &file;
+  jpeg.len = file.size();
+  jpeg.index = 0;
+  jpeg.x = x;
+  jpeg.y = y;
+  jpeg.maxWidth = maxWidth;
+  jpeg.maxHeight = maxHeight;
+  jpeg.offX = offX;
+  jpeg.offY = offY;
+  jpeg.scale = scale;
+  jpeg.tft = this;
+
+  jpeg_err_t res = jpgDecode(&jpeg, jpgReadFile);
+
+  file.close();
+
+  return res;
+}
+
+/*
+ * PNG
+ */
+
+#include "utility/pngle.h"
+
+typedef struct _png_draw_params {
+  uint16_t x;
+  uint16_t y;
+  uint16_t maxWidth;
+  uint16_t maxHeight;
+  uint16_t offX;
+  uint16_t offY;
+  double scale;
+  uint8_t alphaThreshold;
+
+  TFT_eSPI *tft;
+} png_file_decoder_t;
+
+static void pngle_draw_callback(pngle_t *pngle, uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint8_t rgba[4])
+{
+  png_file_decoder_t *p = (png_file_decoder_t *)pngle_get_user_data(pngle);
+  uint16_t color = jpgColor(rgba); // XXX: It's PNG ;)
+
+  if (x < p->offX || y < p->offY) return ;
+  x -= p->offX;
+  y -= p->offY;
+
+  // An interlaced file with alpha channel causes disaster, so use 1 here for simplicity
+  w = 1;
+  h = 1;
+
+  if (p->scale != 1.0) {
+    x = (uint32_t)ceil(x * p->scale);
+    y = (uint32_t)ceil(y * p->scale);
+    w = (uint32_t)ceil(w * p->scale);
+    h = (uint32_t)ceil(h * p->scale);
+  }
+
+  if (x >= p->maxWidth || y >= p->maxHeight) return ;
+  if (x + w >= p->maxWidth) w = p->maxWidth - x;
+  if (y + h >= p->maxHeight) h = p->maxHeight - y;
+
+  x += p->x;
+  y += p->y;
+
+  if (rgba[3] >= p->alphaThreshold) {
+    p->tft->fillRect(x, y, w, h, color);
+  }
+}
+
+png_err_t TFT_eSPI::drawPngFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y,
+                            uint16_t maxWidth, uint16_t maxHeight, uint16_t offX,
+                            uint16_t offY, double scale, uint8_t alphaThreshold)
+{
+  File file = fs.open(path, "r");
+  if (!file) {
+    // log_e("Failed to open file for reading");
+    return PNG_FILE_READ_ERROR;
+  }
+
+  pngle_t *pngle = pngle_new();
+
+  png_file_decoder_t png;
+
+  if (!maxWidth) {
+    maxWidth = width() - x;
+  }
+  if (!maxHeight) {
+    maxHeight = height() - y;
+  }
+
+  png.x = x;
+  png.y = y;
+  png.maxWidth = maxWidth;
+  png.maxHeight = maxHeight;
+  png.offX = offX;
+  png.offY = offY;
+  png.scale = scale;
+  png.alphaThreshold = alphaThreshold;
+  png.tft = this;
+
+  pngle_set_user_data(pngle, &png);
+  pngle_set_draw_callback(pngle, pngle_draw_callback);
+
+  // Feed data to pngle
+  uint8_t buf[1024];
+  int remain = 0;
+  int len;
+  while ((len = file.read(buf + remain, sizeof(buf) - remain)) > 0) {
+    int fed = pngle_feed(pngle, buf, remain + len);
+    if (fed < 0) {
+      // log_e("[pngle error] %s", pngle_error(pngle));
+      break;
+    }
+
+    remain = remain + len - fed;
+    if (remain > 0) memmove(buf, buf + fed, remain);
+  }
+
+  pngle_destroy(pngle);
+  file.close();
+
+  return PNG_OK;
+}
+
+#if defined(ESP8266) || defined(ESP32)
+
+png_err_t TFT_eSPI::drawPngUrl(const char *url, uint16_t x, uint16_t y,
+                            uint16_t maxWidth, uint16_t maxHeight, uint16_t offX,
+                            uint16_t offY, double scale, uint8_t alphaThreshold)
+{
+  HTTPClient http;
+
+#ifdef ESP32
+      http.begin(url);
+#endif
+#ifdef ESP8266
+      std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+      client->setInsecure();
+      http.begin(*client, url);
+#endif
+
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    // log_e("HTTP ERROR: %d\n", httpCode);
+    http.end();
+    return PNG_HTTP_ERROR;
+  }
+
+  WiFiClient *stream = http.getStreamPtr();
+
+  pngle_t *pngle = pngle_new();
+
+  png_file_decoder_t png;
+
+  if (!maxWidth) {
+    maxWidth = width() - x;
+  }
+  if (!maxHeight) {
+    maxHeight = height() - y;
+  }
+
+
+  png.x = x;
+  png.y = y;
+  png.maxWidth = maxWidth;
+  png.maxHeight = maxHeight;
+  png.offX = offX;
+  png.offY = offY;
+  png.scale = scale;
+  png.alphaThreshold = alphaThreshold;
+  png.tft = this;
+
+  pngle_set_user_data(pngle, &png);
+  pngle_set_draw_callback(pngle, pngle_draw_callback);
+
+  // Feed data to pngle
+  uint8_t buf[1024];
+  int remain = 0;
+  int len;
+  while (http.connected()) {
+    size_t size = stream->available();
+    if (!size) { delay(1); continue; }
+
+    if (size > sizeof(buf) - remain) size = sizeof(buf) - remain;
+    if ((len = stream->readBytes(buf + remain, size)) > 0) {
+      int fed = pngle_feed(pngle, buf, remain + len);
+      if (fed < 0) {
+        // log_e("[pngle error] %s", pngle_error(pngle));
+        break;
+      }
+
+      remain = remain + len - fed;
+      if (remain > 0) memmove(buf, buf + fed, remain);
+    }
+  }
+
+  pngle_destroy(pngle);
+  http.end();
+
+  return PNG_OK;
+}
+
+#endif
 
 /***************************************************************************************
 ** Function name:           setCursor
@@ -3279,7 +3739,7 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 ** Function name:           drawPixel
 ** Description:             push a single pixel at an arbitrary position
 ***************************************************************************************/
-void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
+void TFT_eSPI::                                                                               drawPixel(int32_t x, int32_t y, uint32_t color)
 {
   if (_vpOoB) return;
 

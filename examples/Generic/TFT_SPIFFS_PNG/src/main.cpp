@@ -47,7 +47,7 @@ void setup()
   // Now initialise the TFT
   tft.begin();
   tft.setRotation(TFT_ROTATION); // 0 & 2 Portrait. 1 & 3 landscape
-  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(TFT_WHITE);
 }
 
 //====================================================================================
@@ -58,7 +58,7 @@ void loop()
   int x = random(tft.width() - 128);
   int y = random(tft.height() - 160);
 
-  tft.drawBmpFile(SPIFFS, "/parrot.bmp", x, y);
+  tft.drawPngFile(SPIFFS, "/parrot.png", x, y);
 
   delay(1000);
 }
