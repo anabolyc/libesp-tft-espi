@@ -517,10 +517,6 @@ class TFT_eSPI : public Print { friend class TFT_eSprite; // Sprite class has ac
 
   void     drawBmpFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y);
   
-  inline void writePixels(uint16_t * colors, uint32_t len){
-    SPI.writePixels((uint8_t*)colors , len * 2);
-  }
-
   int16_t jpeg_x = 0;
   int16_t jpeg_y = 0;
 
