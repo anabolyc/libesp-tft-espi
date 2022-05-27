@@ -9,7 +9,7 @@ void setup(void) {
   uint16_t calibrationData[5];
   uint8_t calDataOK = 0;
 
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   Serial.println("starting");
 
   tft.init();

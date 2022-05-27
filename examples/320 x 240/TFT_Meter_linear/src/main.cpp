@@ -36,7 +36,7 @@ int d = 0;
 void setup(void) {
   tft.init();
   tft.setRotation(1);
-  Serial.begin(57600); // For debug
+  Serial.begin(SERIAL_BAUD); // For debug
   tft.fillScreen(TFT_BLACK);
 
   analogMeter(); // Draw analogue meter

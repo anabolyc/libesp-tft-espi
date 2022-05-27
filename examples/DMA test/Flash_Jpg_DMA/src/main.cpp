@@ -56,7 +56,7 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap)
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   Serial.println("\n\n Testing TJpg_Decoder library");
 
   // Initialise the TFT

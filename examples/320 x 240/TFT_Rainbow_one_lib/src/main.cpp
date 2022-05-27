@@ -27,7 +27,7 @@ byte state = 0;
 unsigned int colour = red << 11; // Colour order is RGB 5+6+5 bits each
 
 void setup(void) {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   tft.init();
   tft.setRotation(2);
   tft.fillScreen(TFT_BLACK);

@@ -31,7 +31,7 @@ int8_t ramp = 1;
 
 void setup(void) {
   tft.begin();
-  //Serial.begin(9600);
+  //Serial.begin(SERIAL_BAUD);
   tft.setRotation(1);
 
   tft.fillScreen(TFT_BLACK);

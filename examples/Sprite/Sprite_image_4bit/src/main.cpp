@@ -51,7 +51,7 @@ uint16_t cmap[16];
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   Serial.println();
 
   delay(50);

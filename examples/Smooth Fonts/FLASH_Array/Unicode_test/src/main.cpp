@@ -45,7 +45,7 @@ uint16_t fg = TFT_WHITE;
 //====================================================================================
 void setup()
 {
-  Serial.begin(115200); // Used for messages and the C array generator
+  Serial.begin(SERIAL_BAUD); // Used for messages and the C array generator
 
   Serial.println("Font test!");
 

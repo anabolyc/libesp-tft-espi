@@ -39,7 +39,7 @@ uint32_t icount = 0;
 // Setup
 //####################################################################################################
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   tft.begin();
 }
 

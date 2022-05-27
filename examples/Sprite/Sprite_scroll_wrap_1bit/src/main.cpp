@@ -36,7 +36,7 @@ uint16_t *gfxPtr; // Pointer to start of graphics sprite memory area
 //==========================================================================================
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   tft.init();
   tft.fillScreen(TFT_BLACK);
 

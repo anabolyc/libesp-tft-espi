@@ -54,7 +54,7 @@ bool SwitchOn = false;
 //------------------------------------------------------------------------------------------
 void setup(void)
 {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   tft.init();
 
   // Set the rotation before we calibrate

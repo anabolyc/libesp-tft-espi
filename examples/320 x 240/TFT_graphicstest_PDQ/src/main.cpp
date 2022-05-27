@@ -22,7 +22,7 @@ TFT_eSPI tft = TFT_eSPI();
 unsigned long total = 0;
 unsigned long tn = 0;
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   while (!Serial);
   Serial.println(""); Serial.println("");
   Serial.println("Bodmer's TFT_eSPI library Test!"); 

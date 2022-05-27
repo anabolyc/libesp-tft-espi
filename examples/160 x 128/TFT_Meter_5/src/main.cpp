@@ -29,7 +29,7 @@ int old_value[6] = { -1, -1, -1, -1, -1, -1};
 int d = 0;
 
 void setup(void) {
-  Serial.begin(57600); // For debug
+  Serial.begin(SERIAL_BAUD); // For debug
   tft.init();
   tft.setRotation(3);
 

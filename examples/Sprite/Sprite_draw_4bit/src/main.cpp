@@ -41,7 +41,7 @@ TFT_eSprite spr = TFT_eSprite(&tft);  // Declare Sprite object "spr" with pointe
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   Serial.println();
 
   delay(500);

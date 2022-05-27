@@ -42,7 +42,7 @@ static const uint16_t bodyColour[] = {
 // Setup
 // =========================================================================
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);

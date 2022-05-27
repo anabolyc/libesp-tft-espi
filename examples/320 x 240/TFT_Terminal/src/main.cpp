@@ -63,7 +63,7 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   
   // Setup baud rate and draw top banner
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   
   tft.setTextColor(TFT_WHITE, TFT_BLUE);
   tft.fillRect(0,0,240,16, TFT_BLUE);

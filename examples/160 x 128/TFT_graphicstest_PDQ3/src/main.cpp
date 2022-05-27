@@ -28,7 +28,7 @@ extern "C" char __data_load_end[];	// end of FLASH (used to check amount of Flas
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   Serial.println(F("TFT 1.8\" SPI TFT Test!     ")); 
  

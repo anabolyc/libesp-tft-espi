@@ -57,7 +57,7 @@ TFT_eSprite spr = TFT_eSprite(&tft);  // Create Sprite object "spr" with pointer
 // the pointer is used by pushSprite() to push it onto the TFT
 
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   tft.init();
 

@@ -21,7 +21,7 @@ TFT_eSPI tft = TFT_eSPI();
 unsigned long total = 0;
 unsigned long tn = 0;
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   while (!Serial);
 
   Serial.println(""); Serial.println("");

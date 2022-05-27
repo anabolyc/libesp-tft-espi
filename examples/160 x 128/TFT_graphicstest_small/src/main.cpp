@@ -24,7 +24,7 @@ TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
 float p = 3.1415926;
 
 void setup(void) {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   Serial.print("Hello! ST7735 TFT Test");
 
   // Use this initializer if you're using a 1.8" TFT

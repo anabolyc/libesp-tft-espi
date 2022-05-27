@@ -114,7 +114,7 @@ void showreg(uint8_t reg, uint8_t bits, uint8_t dummy)
 void setup() {
     // put your setup code here, to run once:
     uint32_t ID = 0;
-    Serial.begin(115200);
+    Serial.begin(SERIAL_BAUD);
 
     delay(4000); // Delay to allow USB to connect to a Leonardo etc
     

@@ -30,7 +30,7 @@ void setup() {
   zc = random(256);
   zx = random(256);
 
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);

@@ -51,7 +51,7 @@ byte xcolon = 0, xsecs = 0;
 unsigned int colour = 0;
 
 void setup(void) {
-  //Serial.begin(115200);
+  //Serial.begin(SERIAL_BAUD);
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);

@@ -56,7 +56,7 @@ circle_t *circle = new circle_param;
 // Setup
 // #########################################################################
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   tft.init();
   tft.initDMA();

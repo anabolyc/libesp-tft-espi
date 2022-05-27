@@ -29,7 +29,7 @@ byte     pos[42];
 uint16_t xPos = 0;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   randomSeed(analogRead(A0));
   tft.init();
   tft.setRotation(0);

@@ -14,7 +14,7 @@ TFT_eSPI tft = TFT_eSPI(); // Invoke custom library
 
 void setup() {
   // Use serial port
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   // Initialise the TFT screen
   tft.init();

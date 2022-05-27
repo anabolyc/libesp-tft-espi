@@ -62,7 +62,7 @@ void fillGradient() {
 }
 
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   tft.begin();
 

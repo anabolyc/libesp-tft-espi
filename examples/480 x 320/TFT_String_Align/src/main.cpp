@@ -42,7 +42,7 @@ unsigned long drawTime = 0;
 int x, y;  // Coordinates for drawing
 
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   tft.init();
   tft.setRotation(1);
 }

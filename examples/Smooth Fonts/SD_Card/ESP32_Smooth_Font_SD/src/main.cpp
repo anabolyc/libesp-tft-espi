@@ -37,7 +37,7 @@ TFT_eSPI tft = TFT_eSPI();  // Invoke library
 // Setup
 // -------------------------------------------------------------------------
 void setup(void) {
-  Serial.begin(115200); // Used for messages
+  Serial.begin(SERIAL_BAUD); // Used for messages
 
   // Initialise the SD library before the TFT so the chip select is defined
   if (!SD.begin()) {

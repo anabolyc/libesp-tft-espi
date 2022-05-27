@@ -39,7 +39,7 @@ uint16_t pixelColor(uint16_t x, uint16_t y) { return tft.readPixel(x, y); }
 
 
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
   tft.begin();
 

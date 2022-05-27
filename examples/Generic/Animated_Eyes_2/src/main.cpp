@@ -96,7 +96,7 @@ uint32_t startTime;  // For FPS indicator
 
 // INITIALIZATION -- runs once at startup ----------------------------------
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   //while (!Serial);
   Serial.println("Starting");
 

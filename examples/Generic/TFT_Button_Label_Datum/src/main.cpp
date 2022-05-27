@@ -43,7 +43,7 @@ TFT_eSPI_Button key[NUM_KEYS];
 
 void setup() {
   
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   
   tft.init();
 
